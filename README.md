@@ -1,4 +1,4 @@
-# kiwi-hands
+# hand-to-spritesheet
 A python script for Windows 11 that automatically creates hand spritesheets from green/blue screen `.mp4` videos.
 
 I've only tested this script using recordings from my Google Pixel 7 (using OpenCamera). Some tweaks may be needed for different video encodings.
