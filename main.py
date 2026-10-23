@@ -5,16 +5,18 @@ import shutil
 import glob
 import random
 
-# basic video settings
-chromakey = "0x208c63"
-output_scale = 0.4
-fps = 12
+# basic settings
+chroma_color = "0x2c916a" # will need to change manually each time to account for exposure differences
+chroma_similarity = 0.15 # [0, 1]; lower = less of the subject is keyed out. decrease if the hand has chunks taken out 
+output_scale = 0.4 # original video resolution x output scale = resolution of each frame in the spritesheet
+fps = 12 
 
 # advanced settings
-inference_size = 1024 # [512, 1024, 2048]
-despill = 1 # [1, 8]
-internal_width = 1920
-internal_height = 1080
+chroma_blend = 0.0 # [0, 1]; how much the chroma key result is blurred. should generally be kept at 0.0 for crisp edges
+inference_size = 1024 # [512, 1024, 2048]; higher = crisper results but takes longer
+internal_width, internal_height = 1920, 1080 # best to keep as the size of the original video but can be downscaled for speed
+refiner = 1.0 # [0, 1]; see CorridorKey for explanation because idk what this does
+despill = 8 # [1, 10]; integer; removes some of the green light bounce
 
 # paths to stuff
 cwd = os.getcwd()
@@ -37,13 +39,13 @@ subprocess.run(["ffmpeg", "-i", video_path,
 
 # generate quick alpha mask with chroma key
 subprocess.run(["ffmpeg", "-i", downscaled_path, 
-                "-vf", f"scale={internal_width}:{internal_height}:flags=neighbor,colorkey={chromakey}:similarity=0.15:blend=0.0,format=rgba,alphaextract[alfa]", "-pix_fmt", "gray", alpha_mask_path], 
+                "-vf", f"scale={internal_width}:{internal_height}:flags=neighbor,colorkey={chroma_color}:similarity={chroma_similarity}:blend={chroma_blend},format=rgba,alphaextract[alfa]", "-pix_fmt", "gray", alpha_mask_path], 
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # use corridorkey to get clean images
 subprocess.run([os.path.join(cwd, "CorridorKey", ".venv", "Scripts", "activate"), "&&", 
                 "corridorkey", "run-inference", 
-                "--srgb", f"--despill={despill}", "--despeckle", f"--image-size={inference_size}", "--refiner=1.0", "--no-comp", "--no-tile", "--screen-color=auto"], 
+                "--srgb", f"--despill={despill}", "--despeckle", f"--image-size={inference_size}", f"--refiner={refiner}", "--no-comp", "--no-tile", "--screen-color=auto"], 
                 shell=True, cwd=os.path.join(cwd, "CorridorKey"))
 
 # get bounding box to crop images
