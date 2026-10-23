@@ -6,13 +6,15 @@ import glob
 import random
 
 # basic video settings
-chromakey = "0x248463"
-width = 1280#512
-height = 720#288
+chromakey = "0x208c63"
+output_scale = 0.4
 fps = 12
 
 # advanced settings
-inference_size = 2048
+inference_size = 1024 # [512, 1024, 2048]
+despill = 1 # [1, 8]
+internal_width = 1920
+internal_height = 1080
 
 # paths to stuff
 cwd = os.getcwd()
@@ -24,28 +26,30 @@ final_output_path = os.path.join(cwd, f"{sys.argv[1]}_{random.randrange(1000, 99
 
 if os.path.exists("temp"):
     shutil.rmtree("temp")
-
 os.makedirs("temp")
 os.makedirs(os.path.join("temp", "video", "AlphaHint"))
 os.makedirs(os.path.join("temp", "video", "VideoMamaMaskhint"))
 
 # convert to lower fps and lower scale
-subprocess.run(["ffmpeg", "-i", video_path, "-filter:v", f"scale={width}:{height}:flags=neighbor,fps={fps}", downscaled_path],
+subprocess.run(["ffmpeg", "-i", video_path, 
+                "-filter:v", f"scale={internal_width}:{internal_height}:flags=neighbor,fps={fps}", downscaled_path],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # generate quick alpha mask with chroma key
-subprocess.run(["ffmpeg", "-i", downscaled_path, "-vf", 
-                f"scale={width}:{height}:flags=neighbor,colorkey={chromakey}:similarity=0.22:blend=0.0,format=rgba,alphaextract[alfa]", 
-                "-pix_fmt", "gray", alpha_mask_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.run(["ffmpeg", "-i", downscaled_path, 
+                "-vf", f"scale={internal_width}:{internal_height}:flags=neighbor,colorkey={chromakey}:similarity=0.15:blend=0.0,format=rgba,alphaextract[alfa]", "-pix_fmt", "gray", alpha_mask_path], 
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # use corridorkey to get clean images
 subprocess.run([os.path.join(cwd, "CorridorKey", ".venv", "Scripts", "activate"), "&&", 
-                "corridorkey", "run-inference", "--srgb", "--despill=8", "--despeckle", f"--image-size={inference_size}", "--refiner=1.0", "--no-comp", "--no-tile", "--screen-color=green"], 
+                "corridorkey", "run-inference", 
+                "--srgb", f"--despill={despill}", "--despeckle", f"--image-size={inference_size}", "--refiner=1.0", "--no-comp", "--no-tile", "--screen-color=auto"], 
                 shell=True, cwd=os.path.join(cwd, "CorridorKey"))
 
 # get bounding box to crop images
-bounding_box_return = subprocess.run(["magick", corridor_key_output_path, "-background", "white", "-layers", "flatten", "-fuzz", "5%", "-trim", 
-                    "-format", "\"%wx%h%O\"", "info:"], capture_output=True, text=True)
+bounding_box_return = subprocess.run(["magick", corridor_key_output_path, 
+                                      "-background", "white", "-layers", "flatten", "-trim", "-format", "\"%wx%h%O\"", "info:"],
+                                      capture_output=True, text=True)
 bounding_box = str(bounding_box_return.stdout)
 bounding_box = bounding_box[bounding_box.find("\"") + 1 : bounding_box.rfind("\"")]
 
@@ -59,8 +63,8 @@ for exr in sorted(glob.glob(corridor_key_output_path)):
                               capture_output=True, check=True).stdout
 
 # pack into spritesheet
-subprocess.run(["magick", "montage", "-", "-geometry", "+0+0", "-tile", "8x",
-                "-background", "none", "PNG32:" + final_output_path],
+subprocess.run(["magick", "montage", "-", "-geometry", "+0+0", "-tile", "16x",
+                "-background", "none", "-filter", "point", "-scale", f"%{output_scale * 100}", "PNG32:" + final_output_path],
                input=frames, check=True)
 
 print("All done, output image:", final_output_path)

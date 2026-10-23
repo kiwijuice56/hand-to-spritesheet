@@ -12,4 +12,4 @@ A command-line program for Windows to automatically create hand spritesheets fro
 2) Activate CorridorKey's virtual environment and run `.\CorridorKey\.venv\Scripts\python.exe -m pip install --upgrade pip` to install pip and `.\CorridorKey\.venv\Scripts\python.exe -m  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130` to install CUDA torch (the actual version you need will depend on your GPU).
 
 ## Running
-1) Run `python main.py [name of video in input, without file extension]`
+Run `python main.py [name of video in input, without file extension]`
